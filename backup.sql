@@ -31,36 +31,6 @@ COMMENT ON EXTENSION ltree IS 'data type for hierarchical tree-like structures';
 
 
 --
--- Name: employee_detect_cycle(); Type: FUNCTION; Schema: public; Owner: root
---
-
-CREATE FUNCTION public.employee_detect_cycle() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  IF NEW.manager_id IS NOT NULL AND EXISTS (
-    WITH RECURSIVE list_managers (parent) AS (
-     SELECT s.manager_id
-     FROM employee AS s
-     WHERE s.id = NEW.manager_id
-    UNION
-     SELECT s.manager_id
-     FROM employee AS s
-     INNER JOIN list_managers lr ON lr.parent = s.id
-    )
-    SELECT * FROM list_managers WHERE list_managers.parent = NEW.id LIMIT 1
-  ) THEN
-    RAISE EXCEPTION 'Invalid cycle detected in manager/managed relationship in employees';
-  ELSE
-    RETURN NEW;
-  END IF;
-END;
-$$;
-
-
-ALTER FUNCTION public.employee_detect_cycle() OWNER TO root;
-
---
 -- Name: employee_update_manager_path(); Type: FUNCTION; Schema: public; Owner: root
 --
 
@@ -150,6 +120,26 @@ ALTER TABLE ONLY public.employee ALTER COLUMN id SET DEFAULT nextval('public.emp
 
 
 --
+-- Data for Name: employee; Type: TABLE DATA; Schema: public; Owner: root
+--
+
+COPY public.employee (id, name, manager_id, manager_path) FROM stdin;
+1	Alice	\N	1
+3	Carol	1	1.3
+2	Bob	3	1.3.2
+4	David	2	1.3.2.4
+5	Eve	4	1.3.2.4.5
+\.
+
+
+--
+-- Name: employee_id_seq; Type: SEQUENCE SET; Schema: public; Owner: root
+--
+
+SELECT pg_catalog.setval('public.employee_id_seq', 1, false);
+
+
+--
 -- Name: employee employee_pkey; Type: CONSTRAINT; Schema: public; Owner: root
 --
 
@@ -169,13 +159,6 @@ CREATE INDEX employee_manager_id_idx ON public.employee USING btree (manager_id)
 --
 
 CREATE INDEX employee_manager_path_idx ON public.employee USING gist (manager_path);
-
-
---
--- Name: employee tgr_employee_detect_cycle; Type: TRIGGER; Schema: public; Owner: root
---
-
-CREATE TRIGGER tgr_employee_detect_cycle AFTER INSERT OR UPDATE ON public.employee FOR EACH ROW EXECUTE FUNCTION public.employee_detect_cycle();
 
 
 --
